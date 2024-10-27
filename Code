@@ -1,0 +1,59 @@
+# Load required libraries
+library(caret)   # For machine learning functions
+library(dplyr)   # For data manipulation
+
+# Load the dataset
+data <- read.csv('R:/weatherAUS.csv')
+if (nrow(data) == 0) stop("Data not loaded. Please check the file path.")
+cat("Dataset loaded successfully.\n")
+
+# Check the structure and summary of the data
+cat("Dataset structure:\n")
+str(data)
+cat("\nDataset summary:\n")
+summary(data)
+
+# Convert target variable 'RainTomorrow' to a binary factor
+if ("RainTomorrow" %in% colnames(data)) {
+  data$RainTomorrow <- as.factor(ifelse(data$RainTomorrow == "Yes", 1, 0))
+  cat("'RainTomorrow' column converted to binary factor.\n")
+} else {
+  stop("'RainTomorrow' column not found in the dataset.")
+}
+
+# Select relevant features and handle missing values
+data <- data %>% 
+  select(MinTemp, MaxTemp, Rainfall, Humidity9am, Humidity3pm, Pressure9am, Pressure3pm, WindGustSpeed, RainTomorrow) %>%
+  na.omit()
+
+# Check for remaining rows after omitting NA values
+cat("Remaining rows after omitting NA values:", nrow(data), "\n")
+if (nrow(data) == 0) stop("No data left after removing NAs.")
+
+# Split the dataset into training and testing sets
+set.seed(123)  # For reproducibility
+trainIndex <- createDataPartition(data$RainTomorrow, p = 0.8, list = FALSE)
+train_data <- data[trainIndex, ]  # Training data
+test_data <- data[-trainIndex, ]   # Testing data
+cat("Data split into training and testing sets.\n")
+
+# Train a Random Forest model
+cat("Training Random Forest model...\n")
+model <- train(RainTomorrow ~ ., data = train_data, method = "rf", trControl = trainControl(method = "cv", number = 5))
+cat("Model training complete.\n")
+
+# Make predictions
+cat("Making predictions on test data...\n")
+predictions <- predict(model, newdata = test_data)
+
+# Check lengths before evaluating the model
+if (length(predictions) != nrow(test_data)) stop("Length of predictions does not match the test data.")
+
+# Evaluate the model
+conf_matrix <- confusionMatrix(predictions, test_data$RainTomorrow)
+cat("Confusion Matrix:\n")
+print(conf_matrix)
+
+# Calculate Accuracy
+accuracy <- conf_matrix$overall['Accuracy']
+cat("Model Accuracy:", round(accuracy * 100, 2), "%\n")
